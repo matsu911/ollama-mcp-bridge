@@ -48,7 +48,7 @@ export class LLMClient {
 
   setToolRegistry(registry: DynamicToolRegistry) {
     this.toolRegistry = registry;
-    logger.debug('Tool registry set with tools:', registry.getAllTools());
+    logger.debug(`Tool registry set with tools: ${registry.getAllTools()}`);
   }
 
   public async listTools(): Promise<void> {
@@ -86,10 +86,10 @@ export class LLMClient {
       
       if (response.ok) {
         const data = await response.json();
-        logger.debug('Ollama connection test successful:', data);
+        logger.debug(`Ollama connection test successful: ${data}`);
         return true;
       } else {
-        logger.error('Ollama connection test failed with status:', response.status);
+        logger.error(`Ollama connection test failed with status: ${response.status}`);
         return false;
       }
     } catch (error) {
@@ -97,7 +97,7 @@ export class LLMClient {
         if (error.name === 'AbortError') {
           logger.error('Ollama connection test timed out after 5 seconds');
         } else {
-          logger.error('Ollama connection test failed with error:', error.message);
+          logger.error(`Ollama connection test failed with error: ${error.message}`);
         }
       }
       return false;
@@ -111,7 +111,7 @@ export class LLMClient {
       try {
         logger.debug('Attempting to kill Ollama by process name...');
         const { stdout: killOutput } = await execAsync('taskkill /F /IM ollama.exe');
-        logger.debug('Taskkill output:', killOutput);
+        logger.debug(`Taskkill output: ${killOutput}`);
       } catch (e) {
         logger.debug('No Ollama process found to kill');
       }
@@ -134,7 +134,7 @@ export class LLMClient {
       await new Promise(resolve => setTimeout(resolve, 2000));
       logger.debug('Ollama cleanup process completed');
     } catch (error) {
-      logger.error('Error during Ollama force kill:', error);
+      logger.error(`Error during Ollama force kill: ${error}`);
     }
   }
 
@@ -159,15 +159,15 @@ export class LLMClient {
     const ollamaProcess = exec('ollama serve', { windowsHide: true });
     
     ollamaProcess.stdout?.on('data', (data) => {
-      logger.debug('Ollama stdout:', data.toString());
+      logger.debug(`Ollama stdout: ${data}`);
     });
     
     ollamaProcess.stderr?.on('data', (data) => {
-      logger.debug('Ollama stderr:', data.toString());
+      logger.debug(`Ollama stderr: ${data}`);
     });
     
     ollamaProcess.on('error', (error) => {
-      logger.error('Error starting Ollama:', error);
+      logger.error(`Error starting Ollama: ${error}`);
     });
     
     ollamaProcess.unref();
@@ -252,8 +252,10 @@ export class LLMClient {
       };
 
       // Add structured output format if a tool is detected
+      logger.debug(`Current tool: ${this.currentTool}`);
       if (this.currentTool) {
         const toolSchema = this.currentTool ? this.toolSchemas[this.currentTool as keyof typeof toolSchemas] : null;
+        logger.debug(`Tool schema: ${toolSchema}`);
         if (toolSchema) {
           payload.format = {
             type: "object",
@@ -270,12 +272,12 @@ export class LLMClient {
             },
             required: ["name", "arguments", "thoughts"]
           };
-          logger.debug('Added format schema for tool:', this.currentTool);
-          logger.debug('Schema:', JSON.stringify(payload.format, null, 2));
+          logger.debug(`Added format schema for tool: ${this.currentTool}`);
+          logger.debug(`Schema: ${JSON.stringify(payload.format, null, 2)}`);
         }
       }
 
-      logger.debug('Preparing Ollama request with payload:', JSON.stringify(payload, null, 2));
+      logger.debug(`Preparing Ollama request with payload: ${JSON.stringify(payload, null, 2)}`);
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
@@ -307,7 +309,7 @@ export class LLMClient {
 
       logger.debug('Response received from Ollama, parsing...');
       const completion = await response.json() as OllamaResponse;
-      logger.debug('Parsed response:', completion);
+      logger.debug(`Parsed response: ${completion}`);
 
       let isToolCall = false;
       let toolCalls: ToolCall[] = [];
@@ -329,10 +331,10 @@ export class LLMClient {
             }
           }];
           content = contentObj.thoughts || "Using tool...";
-          logger.debug('Parsed structured tool call:', { toolCalls });
+          logger.debug(`Parsed structured tool call: ${toolCalls}`);
         }
       } catch (e) {
-        logger.debug('Response is not a structured tool call:', e);
+        logger.debug(`Response is not a structured tool call: ${e}`);
       }
 
       const result = {
@@ -367,7 +369,7 @@ export class LLMClient {
         logger.error('Request aborted due to timeout');
         throw new Error(`Request timed out after ${LLMClient.REQUEST_TIMEOUT/1000} seconds`);
       }
-      logger.error('LLM invocation failed:', error);
+      logger.error(`LLM invocation failed: ${error}`);
       throw error;
     } finally {
       logger.debug('Cleaning up Ollama process...');

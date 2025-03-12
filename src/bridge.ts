@@ -71,7 +71,7 @@ export class MCPLLMBridge implements MCPLLMBridge {
       this.llmClient.setToolRegistry(this.toolRegistry);
       
       logger.info(`Initialized with ${this.tools.length} total tools`);
-      logger.debug('Available tools:', this.tools.map(t => t.function.name).join(', '));
+      logger.debug(`Available tools: ${this.tools.map(t => t.function.name).join(', ')}`);
       
       return true;
     } catch (error: any) {
@@ -94,7 +94,7 @@ export class MCPLLMBridge implements MCPLLMBridge {
           }
         }
       };
-      logger.debug(`Converted tool ${tool.name}:`, JSON.stringify(converted, null, 2));
+      logger.debug(`Converted tool ${tool.name}: ${JSON.stringify(converted, null, 2)}`);
       return converted;
     });
   }
@@ -158,7 +158,7 @@ export class MCPLLMBridge implements MCPLLMBridge {
         logger.info(`[MCP] Sending call to MCP...`);
         const result = await Promise.race([mcpCallPromise, timeoutPromise]);
         logger.info(`[MCP] Received response from MCP`);
-        logger.debug(`[MCP] Tool result:`, result);
+        logger.debug(`[MCP] Tool result: ${result}`);
         
         toolResponses.push({
           tool_call_id: toolCall.id,

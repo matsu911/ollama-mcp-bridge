@@ -59,6 +59,9 @@ export const logger = winston.createLogger({
   transports: [
     new winston.transports.Console({
       level: 'debug' // Changed to 'debug' to show more output
-    })
+    }),
+    new winston.transports.File({
+      filename: 'debug.log', level: 'debug'
+    }),
   ]
 });
