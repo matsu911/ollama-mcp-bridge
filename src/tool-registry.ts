@@ -67,7 +67,9 @@ export class DynamicToolRegistry {
   "name": "${tool.name}",
   "arguments": ${JSON.stringify(this.generateExampleArgs(tool.inputSchema), null, 2)},
   "thoughts": "Explanation of why you're using this tool"
-}`;
+}
+Once the tool returns the information, summarize it concisely without making another tool call.
+`;
   }
 
   detectToolFromPrompt(prompt: string): string | null {
