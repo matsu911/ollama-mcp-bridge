@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import { logger } from './logger';
 import { ServerParameters } from './types';
+import config from "../bridge_config";
 
 export interface BridgeConfigFile {
   mcpServers: {
@@ -43,13 +44,13 @@ const DEFAULT_CONFIG: BridgeConfigFile = {
 
 export async function loadBridgeConfig(): Promise<BridgeConfigFile> {
   // Change to look for config in the project directory
-  const projectDir = path.resolve(__dirname, '..');
-  const configPath = path.join(projectDir, 'bridge_config.json');
+  // const projectDir = path.resolve(__dirname, '..');
+  // const configPath = path.join(projectDir, 'bridge_config.json');
   
   try {
-    const configData = await fs.readFile(configPath, 'utf-8');
-    const config = JSON.parse(configData);
-    logger.info(`Loaded bridge configuration from ${configPath}`);
+    // const configData = await fs.readFile(configPath, 'utf-8');
+    // const config = JSON.parse(configData);
+    // logger.info(`Loaded bridge configuration from ${configPath}`);
 
     return {
       ...DEFAULT_CONFIG,
@@ -64,7 +65,7 @@ export async function loadBridgeConfig(): Promise<BridgeConfigFile> {
       }
     };
   } catch (error: any) {
-    logger.warn(`Could not load bridge_config.json from ${configPath}, using defaults`);
+    // logger.warn(`Could not load bridge_config.json from ${configPath}, using defaults`);
     return DEFAULT_CONFIG;
   }
 }
