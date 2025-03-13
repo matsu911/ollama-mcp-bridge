@@ -104,6 +104,23 @@ export class LLMClient {
     }
   }
 
+  private async unloadModel(): Promise<void> {
+    logger.debug('Unload model request to Ollama...');
+    const payload = {
+      model: this.config.model,
+      messages: [],
+      keep_alive: 0,
+    };
+    const response = await fetch(`${this.config.baseUrl}/api/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      // signal: controller.signal
+    });
+  }
+
   private async forceKillOllama(): Promise<void> {
     try {
       logger.debug('Starting Ollama cleanup process...');
@@ -152,40 +169,42 @@ export class LLMClient {
   }
 
   async invokeWithPrompt(prompt: string) {
-    logger.debug('Force killing any existing Ollama processes...');
-    await this.forceKillOllama();
+    logger.debug("invokeWithPrompt started...");
+    await this.unloadModel();
+    // logger.debug('Force killing any existing Ollama processes...');
+    // await this.forceKillOllama();
 
-    logger.debug('Starting new Ollama instance...');
-    const ollamaProcess = exec('ollama serve', { windowsHide: true });
+    // logger.debug('Starting new Ollama instance...');
+    // const ollamaProcess = exec('ollama serve', { windowsHide: true });
     
-    ollamaProcess.stdout?.on('data', (data) => {
-      logger.debug(`Ollama stdout: ${data}`);
-    });
-    
-    ollamaProcess.stderr?.on('data', (data) => {
-      logger.debug(`Ollama stderr: ${data}`);
-    });
-    
-    ollamaProcess.on('error', (error) => {
-      logger.error(`Error starting Ollama: ${error}`);
-    });
-    
-    ollamaProcess.unref();
+    // ollamaProcess.stdout?.on('data', (data) => {
+    //   logger.debug(`Ollama stdout: ${data}`);
+    // });
+    //
+    // ollamaProcess.stderr?.on('data', (data) => {
+    //   logger.debug(`Ollama stderr: ${data}`);
+    // });
+    //
+    // ollamaProcess.on('error', (error) => {
+    //   logger.error(`Error starting Ollama: ${error}`);
+    // });
+    //
+    // ollamaProcess.unref();
 
-    let connected = false;
-    for (let i = 0; i < 10; i++) {
-      logger.debug(`Waiting for Ollama to start (attempt ${i + 1}/10)...`);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      if (await this.testConnection()) {
-        logger.debug('Ollama is ready and responding');
-        connected = true;
-        break;
-      }
-    }
-    
-    if (!connected) {
-      throw new Error('Failed to start Ollama after 10 attempts');
-    }
+    // let connected = false;
+    // for (let i = 0; i < 10; i++) {
+    //   logger.debug(`Waiting for Ollama to start (attempt ${i + 1}/10)...`);
+    //   await new Promise(resolve => setTimeout(resolve, 1000));
+    //   if (await this.testConnection()) {
+    //     logger.debug('Ollama is ready and responding');
+    //     connected = true;
+    //     break;
+    //   }
+    // }
+    //
+    // if (!connected) {
+    //   throw new Error('Failed to start Ollama after 10 attempts');
+    // }
 
     // Detect tool using registry if available
     if (this.toolRegistry) {
@@ -203,41 +222,39 @@ export class LLMClient {
     return this.invoke([]);
   }
 
+  private handleToolResults(toolResults: any[]) {
+    for (const result of toolResults) {
+      // Convert MCP response to proper Ollama tool call format
+      const toolOutput = result.output;
+      const message = {
+        role: 'tool',
+        content: String(toolOutput),
+        tool_call_id: result.tool_call_id
+      };
+      try {
+        const parsedOutput = JSON.parse(toolOutput);
+        if (parsedOutput.content && Array.isArray(parsedOutput.content)) {
+          // Extract text content from MCP response
+          const content = parsedOutput.content
+            .filter((item: any) => item.type === 'text')
+            .map((item: any) => item.text)
+            .join('\n');
+          this.messages.push({ ...message, content });
+        } else {
+          this.messages.push(message);
+        }
+      } catch (e) {
+        // If not JSON, use as-is
+        this.messages.push(message);
+      }
+    }
+  }
+
   async invoke(toolResults: any[] = []) {
+    logger.debug("invoke started...");
     try {
       if (toolResults.length > 0) {
-        for (const result of toolResults) {
-          // Convert MCP response to proper Ollama tool call format
-          const toolOutput = result.output;
-          try {
-            const parsedOutput = JSON.parse(toolOutput);
-            if (parsedOutput.content && Array.isArray(parsedOutput.content)) {
-              // Extract text content from MCP response
-              const content = parsedOutput.content
-                .filter((item: any) => item.type === 'text')
-                .map((item: any) => item.text)
-                .join('\n');
-              this.messages.push({
-                role: 'tool',
-                content,
-                tool_call_id: result.tool_call_id
-              });
-            } else {
-              this.messages.push({
-                role: 'tool',
-                content: String(toolOutput),
-                tool_call_id: result.tool_call_id
-              });
-            }
-          } catch (e) {
-            // If not JSON, use as-is
-            this.messages.push({
-              role: 'tool',
-              content: String(toolOutput),
-              tool_call_id: result.tool_call_id
-            });
-          }
-        }
+        this.handleToolResults(toolResults);
       }
 
       const messages = this.prepareMessages();
@@ -255,7 +272,7 @@ export class LLMClient {
       logger.debug(`Current tool: ${this.currentTool}`);
       if (this.currentTool) {
         const toolSchema = this.currentTool ? this.toolSchemas[this.currentTool as keyof typeof toolSchemas] : null;
-        logger.debug(`Tool schema: ${toolSchema}`);
+        logger.debug(`Tool schema: ${JSON.stringify(toolSchema, null, 2)}`);
         if (toolSchema) {
           payload.format = {
             type: "object",
@@ -309,7 +326,7 @@ export class LLMClient {
 
       logger.debug('Response received from Ollama, parsing...');
       const completion = await response.json() as OllamaResponse;
-      logger.debug(`Parsed response: ${completion}`);
+      logger.debug(`Parsed response: ${JSON.stringify(completion, null, 2)}`);
 
       let isToolCall = false;
       let toolCalls: ToolCall[] = [];
@@ -352,7 +369,7 @@ export class LLMClient {
             type: 'function',
             function: {
               name: call.function.name,
-              arguments: call.function.arguments
+              arguments: JSON.parse(call.function.arguments)
             }
           }))
         });
@@ -372,8 +389,9 @@ export class LLMClient {
       logger.error(`LLM invocation failed: ${error}`);
       throw error;
     } finally {
-      logger.debug('Cleaning up Ollama process...');
-      await this.forceKillOllama();
+      await this.unloadModel();
+      // logger.debug('Cleaning up Ollama process...');
+      // await this.forceKillOllama();
     }
   }
 }
